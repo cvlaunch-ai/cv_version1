@@ -1,0 +1,18 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Flutter App",
+            "type": "shell",
+            "command": "C:\\src\\flutter\\bin\\flutter.bat run -d chrome",
+            "options": {
+                "cwd": "${workspaceFolder}/voice_app"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

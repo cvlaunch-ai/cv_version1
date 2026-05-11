@@ -1,0 +1,15 @@
+{
+    "manifest_version": 3,
+    "name": "Voice to Text Pro",
+    "version": "1.0",
+    "description": "Free, real-time voice to text converter in your side panel.",
+    "permissions": [
+        "sidePanel"
+    ],
+    "side_panel": {
+        "default_path": "sidepanel.html"
+    },
+    "action": {
+        "default_title": "Open Voice to Text"
+    }
+}

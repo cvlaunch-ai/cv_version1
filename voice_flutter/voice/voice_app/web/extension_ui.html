@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice to Text Extension</title>
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* AppBar */
+        header {
+            background-color: #673ab7;
+            /* Colors.deepPurple */
+            color: white;
+            padding: 16px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 20px;
+            font-weight: 500;
+            z-index: 10;
+        }
+
+        select {
+            background: white;
+            border: none;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #333;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* Main Content */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Text Area */
+        .text-container {
+            flex: 1;
+            /* Take up all available space */
+            padding: 20px;
+            padding-bottom: 40px;
+            /* Space for word count */
+            background-color: #f5f5f5;
+            overflow-y: scroll;
+            /* Always show scrollbar */
+            scroll-behavior: smooth;
+        }
+
+        #transcription {
+            font-size: 18px;
+            /* Readable size */
+            color: #212121;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            /* Prevent overflow */
+        }
+
+        .preview-text {
+            color: #757575;
+            font-style: italic;
+        }
+
+        /* Word Count Badge */
+        .word-count {
+            position: absolute;
+            bottom: 100px;
+            /* Above FAB area */
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+
+        /* FAB Container */
+        .fab-container {
+            padding: 16px;
+            display: flex;
+            justify-content: center;
+            background-color: white;
+            border-top: 1px solid #e0e0e0;
+            z-index: 10;
+        }
+
+        .fab {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            border: none;
+            background-color: #2196f3;
+            color: white;
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.14);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+
+        .fab.recording {
+            background-color: #f44336;
+            animation: pulse 2s infinite;
+        }
+
+        .fab svg {
+            width: 32px;
+            height: 32px;
+            fill: currentColor;
+        }
+
+        /* Debug Logs (Hidden by default, toggleable if needed, or small) */
+        .debug-section {
+            display: none;
+            /* Hide logs to give more space to text */
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 15px rgba(244, 67, 54, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <span>Voice Note</span>
+        <select id="langSelect">
+            <option value="en-US">English</option>
+            <option value="te-IN">Telugu</option>
+            <option value="hi-IN">Hindi</option>
+            <option value="ta-IN">Tamil</option>
+            <option value="kn-IN">Kannada</option>
+            <option value="ml-IN">Malayalam</option>
+        </select>
+    </header>
+
+    <main>
+        <div class="text-container">
+            <div id="transcription">Press the microphone to start...</div>
+        </div>
+
+        <div class="word-count" id="wordCount">0 words</div>
+
+        <div class="fab-container">
+            <button id="micBtn" class="fab">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                    <path
+                        d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                </svg>
+            </button>
+        </div>
+    </main>
+
+    <script>
+        const micBtn = document.getElementById('micBtn');
+        const transcription = document.getElementById('transcription');
+        const langSelect = document.getElementById('langSelect');
+        const wordCountEl = document.getElementById('wordCount');
+        const textContainer = document.querySelector('.text-container');
+
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        let recognition;
+
+        // Text State
+        let aiCommittedText = "";      // Text from previous AI sessions (Black)
+        let browserCommittedText = ""; // Text confirmed by browser in current session (Gray)
+        let browserInterimText = "";   // Text currently being spoken (Gray)
+
+        function updateWordCount() {
+            const fullText = (aiCommittedText + " " + browserCommittedText + " " + browserInterimText).trim();
+            const count = fullText ? fullText.split(/\s+/).length : 0;
+            wordCountEl.innerText = count + " words";
+        }
+
+        function initSpeechPreview() {
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = langSelect.value;
+
+                recognition.onresult = (event) => {
+                    let interim = '';
+                    let finalChunk = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalChunk += event.results[i][0].transcript;
+                        } else {
+                            interim += event.results[i][0].transcript;
+                        }
+                    }
+
+                    // IMPORTANT: Save final chunks immediately so they aren't lost
+                    if (finalChunk) {
+                        browserCommittedText += finalChunk + " ";
+                    }
+
+                    browserInterimText = interim;
+                    updateDisplay();
+                };
+
+                recognition.onend = () => {
+                    if (isRecording) {
+                        console.log("Silence... restarting listener.");
+                        // If there was any interim text left, save it before restarting
+                        if (browserInterimText) {
+                            browserCommittedText += browserInterimText + " ";
+                            browserInterimText = "";
+                            updateDisplay();
+                        }
+                        try { recognition.start(); } catch (e) { }
+                    }
+                };
+            }
+        }
+
+        function updateDisplay() {
+            const isAtBottom = textContainer.scrollHeight - textContainer.scrollTop <= textContainer.clientHeight + 100;
+
+            // Display: AI (Black) + Browser (Gray)
+            transcription.innerHTML = aiCommittedText +
+                '<span class="preview-text">' + browserCommittedText + browserInterimText + '</span>';
+            updateWordCount();
+
+            if (isAtBottom || browserInterimText.length < 5) {
+                textContainer.scrollTop = textContainer.scrollHeight;
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await sendToBackend(audioBlob);
+                };
+
+                mediaRecorder.start();
+
+                if (recognition) {
+                    recognition.lang = langSelect.value;
+                    try { recognition.start(); } catch (e) { }
+                }
+
+                isRecording = true;
+                micBtn.classList.add('recording');
+
+                if (aiCommittedText === "") {
+                    transcription.innerText = "";
+                }
+
+                // Reset current session buffers
+                browserCommittedText = "";
+                browserInterimText = "";
+                updateDisplay();
+
+            } catch (err) {
+                console.error("Mic Error", err);
+                alert("Microphone access denied. Please allow permission.");
+            }
+        }
+
+        function stopRecording() {
+            if (isRecording) {
+                if (mediaRecorder) mediaRecorder.stop();
+                if (recognition) try { recognition.stop(); } catch (e) { }
+
+                isRecording = false;
+                micBtn.classList.remove('recording');
+
+                if (mediaRecorder && mediaRecorder.stream) {
+                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                }
+            }
+        }
+
+        async function sendToBackend(audioBlob) {
+            const formData = new FormData();
+            formData.append("file", audioBlob, "recording.webm");
+
+            try {
+                const response = await fetch("http://localhost:8000/transcribe", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                const data = await response.json();
+                const text = data.text;
+
+                if (text && !text.startsWith("❌")) {
+                    // SUCCESS: AI replaces the browser text
+                    aiCommittedText += text + " ";
+                    browserCommittedText = ""; // Clear browser buffers
+                    browserInterimText = "";
+                    updateDisplay();
+                }
+
+            } catch (err) {
+                console.error("Backend Error", err);
+            }
+        }
+
+        micBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        initSpeechPreview();
+    </script>
+</body>
+
+</html>

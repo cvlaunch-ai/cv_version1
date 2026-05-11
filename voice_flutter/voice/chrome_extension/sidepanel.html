@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice to Text</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 24px;
+            margin: 0 0 10px 0;
+        }
+
+        .status {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 20px;
+            padding: 8px;
+            border-radius: 8px;
+            background: #e9ecef;
+        }
+
+        .status.recording {
+            background: #d4edda;
+            color: #155724;
+            animation: pulse 2s infinite;
+        }
+
+        .mic-btn {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: none;
+            background: #667eea;
+            color: white;
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px auto;
+        }
+
+        .mic-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .mic-btn.recording {
+            background: #dc3545;
+            box-shadow: 0 4px 10px rgba(220, 53, 69, 0.4);
+        }
+
+        .output {
+            text-align: left;
+            background: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 10px;
+            padding: 15px;
+            min-height: 200px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 16px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .output:empty:before {
+            content: "Text will appear here...";
+            color: #999;
+            font-style: italic;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-small:hover {
+            background: #f8f9fa;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(21, 87, 36, 0.4);
+            }
+
+            70% {
+                box-shadow: 0 0 0 10px rgba(21, 87, 36, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(21, 87, 36, 0);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎤 Voice to Text</h1>
+
+        <div style="margin-bottom: 15px;">
+            <select id="languageSelect"
+                style="padding: 8px; border-radius: 5px; border: 1px solid #ccc; width: 100%; font-size: 14px;">
+                <option value="en-US">English (US)</option>
+                <option value="hi-IN">Hindi (हिन्दी)</option>
+                <option value="bn-IN">Bengali (বাংলা)</option>
+                <option value="te-IN">Telugu (తెలుగు)</option>
+                <option value="mr-IN">Marathi (मराठी)</option>
+                <option value="ta-IN">Tamil (தமிழ்)</option>
+                <option value="ur-IN">Urdu (اردو)</option>
+                <option value="gu-IN">Gujarati (ગુજરાતી)</option>
+                <option value="kn-IN">Kannada (ಕನ್ನಡ)</option>
+                <option value="ml-IN">Malayalam (മലയാളം)</option>
+                <option value="pa-IN">Punjabi (ਪੰਜਾਬੀ)</option>
+            </select>
+        </div>
+
+        <div id="status" class="status">Ready to record</div>
+
+        <button id="micBtn" class="mic-btn">
+            🎤
+        </button>
+
+        <div id="output" class="output" contenteditable="true"></div>
+
+        <div style="margin-top: 10px; text-align: center;">
+            <span id="wordCountBadge"
+                style="background: #667eea; color: white; padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold;">
+                0 words (unlimited)
+            </span>
+        </div>
+
+        <div class="controls">
+            <button class="btn-small" onclick="copyText()">📋 Copy</button>
+            <button class="btn-small" onclick="clearText()">🗑️ Clear</button>
+            <button class="btn-small" onclick="saveToSheet()"
+                style="background: #28a745; color: white; border-color: #28a745;">💾 Save to Sheet</button>
+        </div>
+    </div>
+
+    <script src="sidepanel.js"></script>
+</body>
+
+</html>

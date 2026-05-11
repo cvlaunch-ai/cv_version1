@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "voice_app",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "debug",
+            "program": "${workspaceFolder}/voice_app/lib/main.dart",
+            "cwd": "${workspaceFolder}/voice_app",
+            "args": [
+                "-d",
+                "chrome"
+            ]
+        },
+        {
+            "name": "Whisper Backend",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "cwd": "${workspaceFolder}/whisper_backend",
+            "args": [
+                "main:app",
+                "--reload"
+            ]
+        }
+    ]
+}
