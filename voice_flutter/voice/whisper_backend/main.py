@@ -146,6 +146,9 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import openai
 
+# Central prompt definitions (edit prompts.py to change AI behaviour)
+from prompts import RESUME_EXTRACT_PROMPT, COVER_LETTER_PROMPT
+
 # ================================
 # ✅ API CLIENT CONFIGURATION
 # ================================
@@ -323,13 +326,9 @@ def parse_structured_resume(text: str):
              # Heuristic for location line just containing "Hyderabad"
              data["location"] = line.strip()
         
-        # Check for Role/Job Title in header
+        # Check for Role/Job Title in header (do NOT generate a summary — leave blank)
         role_match = re.search(r"(?:Role|Job Title|Position):\s*(.*)", line, re.I)
-        if role_match:
-             # We can use this to seed the summary if summary is empty
-             role = role_match.group(1).strip()
-             if not data["summary"]:
-                 data["summary"] = f"Aspiring {role} with a strong background in technical skills and a passion for data-driven solutions."
+        # Role title is informational only; we never invent a summary from it
 
     # 2. Section Parsing using Headers
     current_section = None
@@ -440,39 +439,37 @@ def parse_structured_resume(text: str):
 def build_resume_string(data):
     """
     Constructs the PLAIN TEXT resume string (No Markdown/JSON).
-    This is what is sent to Flutter for the text preview.
+    Only renders sections that the user actually provided – NO invented/placeholder text.
     """
-    # Safe Getters
-    name = data.get("full_name") or data.get("name") or "Your Name"
-    phone = data.get("phone") or ""
-    email = data.get("email") or ""
-    loc = data.get("location") or ""
-    
-    summary = data.get("summary") or "Professional Summary..."
-    edu = data.get("education") or "Education Details..."
-    roles = data.get("responsibilities") or "Roles..."
-    proj = data.get("projects") or "Projects..."
-    skills = data.get("skills") or "Skills..."
-    certifications = data.get("certifications") or ""
-    
-    return f"""{name}
-| {phone} | {email} | {loc} |
+    # Use only what the user gave – empty string if missing
+    name = (data.get("full_name") or data.get("name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    email = (data.get("email") or "").strip()
+    loc = (data.get("location") or "").strip()
+    summary = (data.get("summary") or "").strip()
+    edu = (data.get("education") or "").strip()
+    roles = (data.get("responsibilities") or "").strip()
+    proj = (data.get("projects") or "").strip()
+    skills = (data.get("skills") or "").strip()
+    certifications = (data.get("certifications") or "").strip()
 
-Professional Summary
-{summary}
+    # Build contact line only from non-empty parts
+    contact_parts = [p for p in [phone, email, loc] if p]
+    contact_line = " | ".join(contact_parts)
+    if contact_line:
+        contact_line = f"| {contact_line} |"
 
-Education
-{edu}
+    lines = []
+    if name:            lines.append(name)
+    if contact_line:    lines.append(contact_line)
+    if summary:         lines += ["", "Professional Summary", summary]
+    if edu:             lines += ["", "Education", edu]
+    if roles:           lines += ["", "Roles & Responsibilities", roles]
+    if proj:            lines += ["", "Projects", proj]
+    if skills:          lines += ["", "Technologies & Tools", skills]
+    if certifications:  lines += ["", "Certifications", certifications]
 
-Roles & Responsibilities
-{roles}
-
-Projects
-{proj}
-
-Technologies & Tools
-{skills}
-"""
+    return "\n".join(lines)
 
 def build_resume_data(user: dict):
     """
@@ -528,16 +525,8 @@ def build_resume_data(user: dict):
     if isinstance(core_skills, str):
         core_skills = [s.strip() for s in core_skills.split(",")]
         
+    # Only use the summary the user actually provided – never invent one
     summary = clean_val(user.get("summary"))
-    if not summary:
-        skills_str = ', '.join(core_skills) if core_skills else "various technologies"
-        role_label = clean_val(user.get("detected_role"), specialization or "Technical")
-        summary = (
-            f"Aspiring {role_label} professional and {degree} graduate in {specialization} with hands-on project experience in "
-            f"{skills_str}. Proven ability to develop data-driven solutions, and a strong foundation in "
-            "analytical problem-solving. Highly motivated to contribute to innovative projects and "
-            "eager to grow in a dynamic professional environment."
-        )
 
     # 2. Education section
     edu_list = user.get("education", [])
@@ -596,15 +585,9 @@ def build_resume_data(user: dict):
         elif isinstance(raw_resp, str):
             responsibilities = raw_resp
     
-    # Only use professional fallback IF NO responsibilities were provided
+    # If user gave no responsibilities, leave it blank – do NOT invent bullet points
     if not responsibilities:
-        role_label = clean_val(user.get("detected_role"), specialization or "Software Professional")
-        responsibilities = (
-            f"• Technical Collaboration: Worked within project teams to identify and resolve technical challenges during development lifecycles.\n"
-            f"• Solution Implementation: Applied {skills if skills else 'industry standard tools'} to develop, test, and optimize project-specific workflows and data pipelines.\n"
-            f"• Quality Assurance: Conducted rigorous debugging and performance tuning to ensure high-quality delivery and project consistency.\n"
-            f"• Documentation: Authored detailed technical specifications and project findings to ensure reproducibility and knowledge sharing."
-        )
+        responsibilities = ""
 
     # 4. Projects section
     proj_list = user.get("projects", [])
@@ -871,12 +854,12 @@ def extract_resume_details(text: str):
     skills_text = ", ".join(found_skills) if found_skills else "Python, SQL, Excel"
     
     base_info.update({
-        "location": location,
-        "summary": text[:200].replace('\n', ' ') + "..." if len(text) > 50 else "Experienced professional looking for opportunities.",
-        "education": education_list if education_list else [{"degree": "Degree Details", "university": "University Name", "year": "Year"}],
-        "projects": projects_list if projects_list else "Project Experience available upon request.",
-        "roles": [{"role": "Candidate", "company": "Previous Company", "date": "Dates", "details": ["Worked on key projects.", "Collaborated with team."]}],
-        "skills": skills_text,
+        "location": location if location else "",
+        "summary": "",  # Never generate a summary – leave blank
+        "education": education_list if education_list else [],
+        "projects": projects_list if projects_list else [],
+        "roles": [],  # Never invent work experience
+        "skills": skills_text if found_skills else "",
     })
     return base_info
 
@@ -986,16 +969,27 @@ def generate_content_with_gemini(text: str, doc_type: str = "resume"):
         if doc_type == "resume":
             prompt = (
                 "You are a STRICT Resume Data Extractor.\n"
-                "Task: Convert the raw user input into a clean, professional JSON structure for a resume.\n"
-                "CRITICAL: Do NOT skip any details from the input. Extract EVERYTHING related to Name, Education, Projects, and Skills.\n"
-                "STRICTLY follow this structure for the values:\n"
-                "- summary: A professional summary (3-4 lines). Include degree and key skills.\n"
-                "- education: List ALL degrees/schools found. Return list of objects: {university, degree, year, grade}.\n"
-                "- roles: Professional Experience. Use bullet points.\n"
-                "- projects: List ALL projects mentioned with 1-line description. Return list of objects: {name, details (list of strings)}.\n"
-                "- skills: List ALL technical/soft skills mentioned.\n"
-                "- name, email, phone, location: Extract accurately.\n"
-                f"Raw Input: '{text}'"
+                "Your ONLY job is to extract data that is EXPLICITLY present in the user's input.\n\n"
+                "CRITICAL RULES – NEVER break these:\n"
+                "1. DO NOT invent, guess, or hallucinate ANY data.\n"
+                "2. If a field is NOT in the input, set it to empty string \"\" or empty list [].\n"
+                "3. Do NOT use placeholders like 'Your Name', 'University Name', 'Dates', 'N/A'.\n"
+                "4. Extract personal details (name, email, phone, location) EXACTLY as written.\n"
+                "5. For summary: only use text the user explicitly wrote. Do not generate one.\n\n"
+                "Return ONLY valid JSON (no markdown, no explanation):\n"
+                "{\n"
+                "  \"name\": \"\",\n"
+                "  \"email\": \"\",\n"
+                "  \"phone\": \"\",\n"
+                "  \"location\": \"\",\n"
+                "  \"summary\": \"\",\n"
+                "  \"education\": [],\n"
+                "  \"roles\": [],\n"
+                "  \"projects\": [],\n"
+                "  \"skills\": [],\n"
+                "  \"certifications\": []\n"
+                "}\n\n"
+                f"User Input: '{text}'"
             )
         else:
             prompt = (
@@ -1059,27 +1053,32 @@ def generate_content_with_openai(text: str, doc_type: str = "resume"):
     """
     if doc_type == "resume":
         prompt = (
-            "You are a SENIOR RESUME ARCHITECT. Your goal is to turn sparse user input into a PREMIER, ATS-OPTIMIZED resume.\n\n"
-            "STRICT RULES:\n"
-            "1. NO PLACEHOLDERS: Do NOT use '[Placeholders]', '[Dates]', or '[Institution Name]'. If a value is missing, infer a professional, realistic description or use general elite terminology.\n"
-            "2. NARRATIVE EXPANSION: Intelligently expand fragments into professional bullet points. If they say 'I know Python', expand to 'Software Engineering: Leveraged Python for automated data processing and algorithm implementation.'\n"
-            "3. STYLE: Match the tone of a high-achieving B.Tech graduate (like Deepti Challapalli). Use powerful action verbs.\n"
-            "4. ROLES: If the user is a fresher, populate 'roles_and_responsibilities' with high-impact descriptions of their technical training and project teamwork.\n"
-            "5. NO HALLUCINATION OF COMPANIES: Do not invent fake company names, but DO invent professional descriptions of their skills and achievements.\n\n"
-            "Return ONLY valid JSON in the following structure:\n"
+            "You are a STRICT Resume Data Extractor.\n"
+            "Your ONLY job is to extract data that is EXPLICITLY written in the user's input.\n\n"
+            "CRITICAL RULES – You MUST follow every one:\n"
+            "1. DO NOT invent, guess, assume, or hallucinate ANY data.\n"
+            "2. DO NOT expand or paraphrase. Use the user's EXACT words.\n"
+            "3. If a field is NOT present in the input, set it to empty string \"\" or empty list [].\n"
+            "4. DO NOT generate a professional summary — only use text the user explicitly wrote.\n"
+            "5. DO NOT invent an email address if none is given.\n"
+            "6. DO NOT invent education details if none are given.\n"
+            "7. DO NOT invent projects if none are given.\n"
+            "8. DO NOT invent work experience or responsibilities if none are given.\n"
+            "9. DO NOT use placeholders: 'N/A', 'Your Name', 'University Name', 'example@email.com', etc.\n\n"
+            "Return ONLY this exact JSON structure (no markdown, no extra text):\n"
             "{\n"
-            '  "name": "Full Name",\n'
-            '  "email": "Professional Email",\n'
-            '  "phone": "Phone Number",\n'
-            '  "location": "City, State, Country",\n'
-            '  "detected_role": "Target Job Title",\n'
-            '  "professional_summary": "3-4 lines of high-impact narrative summary...",\n'
-            '  "education": [ "Detailed Education Entry (No placeholders)" ],\n'
-            '  "roles_and_responsibilities": [ "Significant achievement 1", "Technical responsibility 2" ],\n'
-            '  "projects": [ "**Project Title:** Detailed description of technical implementation and results." ],\n'
-            '  "technical_skills": [ "Skill Name" ]\n'
+            "  \"name\": \"\",\n"
+            "  \"email\": \"\",\n"
+            "  \"phone\": \"\",\n"
+            "  \"location\": \"\",\n"
+            "  \"summary\": \"\",\n"
+            "  \"education\": [],\n"
+            "  \"roles_and_responsibilities\": [],\n"
+            "  \"projects\": [],\n"
+            "  \"technical_skills\": [],\n"
+            "  \"certifications\": []\n"
             "}\n\n"
-            f"User Information:\n<<< {text} >>>"
+            f"User Input:\n<<<\n{text}\n>>>"
         )
     else:
         prompt = (

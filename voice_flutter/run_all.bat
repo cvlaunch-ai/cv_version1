@@ -39,6 +39,18 @@ timeout /t 5 /nobreak >nul
 REM Start Flutter App
 echo [3/3] Launching Flutter App...
 pushd "%APP_DIR%"
+
+REM Kill any existing Chrome instances to avoid file-lock errors
+echo Clearing Chrome processes...
+taskkill /F /IM chrome.exe /T >nul 2>&1
+timeout /t 2 /nobreak >nul
+
+REM Clean stale Flutter Chrome temp profile to avoid Cookies file lock
+if exist "D:\Temp\flutter_tools*" (
+    echo Cleaning Flutter Chrome temp profiles...
+    rmdir /s /q "D:\Temp" >nul 2>&1
+)
+
 flutter run -d chrome
 popd
 
