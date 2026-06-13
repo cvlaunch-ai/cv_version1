@@ -511,8 +511,8 @@ def build_resume_data(user: dict):
 
     # Core skills (take first 3 of skills if not provided)
     core_skills = user.get("core_skills", [])
-    if not core_skills and user.get("skills"):
-        skills_val = user["skills"]
+    if not core_skills and (user.get("skills") or user.get("technical_skills")):
+        skills_val = user.get("skills") or user.get("technical_skills")
         if isinstance(skills_val, list):
             core_skills = skills_val[:3]
         elif isinstance(skills_val, str):
@@ -526,7 +526,7 @@ def build_resume_data(user: dict):
         core_skills = [s.strip() for s in core_skills.split(",")]
         
     # Only use the summary the user actually provided – never invent one
-    summary = clean_val(user.get("summary"))
+    summary = clean_val(user.get("professional_summary") or user.get("summary"))
 
     # 2. Education section
     edu_list = user.get("education", [])
@@ -550,7 +550,15 @@ def build_resume_data(user: dict):
     # If the user has 'responsibilities' (from AI) or 'experience' (from parser), use it.
     # Otherwise use generic fresher text.
     
-    raw_resp = user.get("responsibilities") or user.get("experience") or []
+    raw_resp = user.get("roles_and_responsibilities") or user.get("responsibilities") or user.get("experience") or []
+    exp_bullets = user.get("experience_bullets") or []
+    
+    # Combine experience bullets and roles if both exist
+    if exp_bullets and raw_resp:
+        if isinstance(raw_resp, list) and isinstance(exp_bullets, list):
+            raw_resp = exp_bullets + raw_resp
+    elif exp_bullets and not raw_resp:
+        raw_resp = exp_bullets
     
     if raw_resp:
         if isinstance(raw_resp, list):
@@ -611,7 +619,7 @@ def build_resume_data(user: dict):
         projects = str(proj_list)
 
     # 5. Skills
-    skills_list = user.get("skills", [])
+    skills_list = user.get("technical_skills") or user.get("skills") or []
     if isinstance(skills_list, list):
         skills = ", ".join(skills_list)
     else:
@@ -1053,32 +1061,29 @@ def generate_content_with_openai(text: str, doc_type: str = "resume"):
     """
     if doc_type == "resume":
         prompt = (
-            "You are a STRICT Resume Data Extractor.\n"
-            "Your ONLY job is to extract data that is EXPLICITLY written in the user's input.\n\n"
-            "CRITICAL RULES – You MUST follow every one:\n"
-            "1. DO NOT invent, guess, assume, or hallucinate ANY data.\n"
-            "2. DO NOT expand or paraphrase. Use the user's EXACT words.\n"
-            "3. If a field is NOT present in the input, set it to empty string \"\" or empty list [].\n"
-            "4. DO NOT generate a professional summary — only use text the user explicitly wrote.\n"
-            "5. DO NOT invent an email address if none is given.\n"
-            "6. DO NOT invent education details if none are given.\n"
-            "7. DO NOT invent projects if none are given.\n"
-            "8. DO NOT invent work experience or responsibilities if none are given.\n"
-            "9. DO NOT use placeholders: 'N/A', 'Your Name', 'University Name', 'example@email.com', etc.\n\n"
-            "Return ONLY this exact JSON structure (no markdown, no extra text):\n"
+            "You are a STRICT Resume Data Extractor. Your goal is to extract ONLY the information provided by the user.\n"
+            "STRICT RULES:\n"
+            "1. MANDATORY GENERATION (ALWAYS DO THIS): You MUST ALWAYS generate the 'professional_summary' (3-4 lines), 'experience_bullets' (4-5 highly detailed professional bullet points detailing their career achievements based on their skills), 'roles_and_responsibilities' (4-5 highly detailed professional bullet points describing daily tasks), and 'technical_skills' (a comprehensive list of skills appropriate for the role). Even if the user only provides their name and a job title, you MUST professionally generate these four sections.\n"
+            "2. SUMMARY & EXPERIENCE: In the 'professional_summary', IF the user provides their years of experience, you MUST explicitly state it in the very first sentence.\n"
+            "3. CONDITIONAL EXTRACTION (ONLY IF MENTIONED): 'education', 'projects', and 'years_of_experience' MUST ONLY be extracted if explicitly mentioned by the user. If they are missing, leave them empty ([] or \"\").\n"
+            "4. NO HALLUCINATION: DO NOT invent personal data (Email, Phone, Education, Projects). NEVER generate fake Education or Projects.\n"
+            "Return ONLY valid JSON in the following structure:\n"
             "{\n"
-            "  \"name\": \"\",\n"
+            "  \"name\": \"Full Name\",\n"
             "  \"email\": \"\",\n"
             "  \"phone\": \"\",\n"
             "  \"location\": \"\",\n"
-            "  \"summary\": \"\",\n"
+            "  \"detected_role\": \"\",\n"
+            "  \"years_of_experience\": \"\",\n"
+            "  \"professional_summary\": \"\",\n"
             "  \"education\": [],\n"
+            "  \"experience_bullets\": [],\n"
             "  \"roles_and_responsibilities\": [],\n"
             "  \"projects\": [],\n"
-            "  \"technical_skills\": [],\n"
-            "  \"certifications\": []\n"
-            "}\n\n"
-            f"User Input:\n<<<\n{text}\n>>>"
+            "  \"technical_skills\": []\n"
+            "}\n"
+            "User Information:\n"
+            f"<<< {text} >>>"
         )
     else:
         prompt = (
@@ -1337,24 +1342,38 @@ def _create_text_file(content: str, filename: str) -> StreamingResponse:
 # PROFESSIONAL TEMPLATE ENGINE (PLATYPUS)
 # ================================
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, Image
+from reportlab.platypus.flowables import HRFlowable
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_JUSTIFY, TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib import colors
 
 def _create_platypus_pdf(elements, filename: str) -> StreamingResponse:
     """Builds a PDF from a list of Flowables (Paragraphs, Tables, etc.)"""
+    # 1. Initialize an in-memory byte buffer
     buffer = io.BytesIO()
+    
+    # 2. Configure the document template
     doc = SimpleDocTemplate(
         buffer, 
         pagesize=letter,
         rightMargin=50, leftMargin=50, 
         topMargin=50, bottomMargin=50
     )
+    
+    # 3. Build the PDF using the assembled elements (Paragraphs, Tables, etc.)
     doc.build(elements)
+    
+    # 4. Reset the buffer's position to the beginning before streaming
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type='application/pdf', headers={
-        'Content-Disposition': f'attachment; filename="{filename}"'
-    })
+    
+    # 5. Return as an attachment using FastAPI's StreamingResponse
+    return StreamingResponse(
+        buffer, 
+        media_type='application/pdf', 
+        headers={
+            'Content-Disposition': f'attachment; filename="{filename}"'
+        }
+    )
 
 def _get_styles():
     styles = getSampleStyleSheet()
@@ -1497,23 +1516,28 @@ def _create_classic_pdf_internal(final_data):
     
     # Custom Styles for Exact Match
     name_style = ParagraphStyle('NameStyle', parent=styles['Normal'], fontSize=16, alignment=TA_CENTER, fontName='Helvetica-Bold', spaceAfter=2)
-    contact_style = ParagraphStyle('ContactStyle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, fontName='Helvetica', spaceAfter=20)
-    section_style = ParagraphStyle('SecStyle', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', spaceBefore=15, spaceAfter=8, textTransform='uppercase')
+    contact_style = ParagraphStyle('ContactStyle', parent=styles['Normal'], fontSize=10, alignment=TA_CENTER, fontName='Helvetica', spaceAfter=15)
+    section_style = ParagraphStyle('SecStyle', parent=styles['Normal'], fontSize=12, fontName='Helvetica-Bold', spaceBefore=15, spaceAfter=0, textTransform='uppercase')
+    line_style = ParagraphStyle('LineStyle', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', textColor=colors.black, leading=6, spaceAfter=10)
     body_style = ParagraphStyle('BodyStyle', parent=styles['Normal'], fontSize=10, leading=13, alignment=TA_LEFT)
     bullet_style = ParagraphStyle('BulletStyle', parent=body_style, leftIndent=15, firstLineIndent=0, spaceAfter=4)
     
     story = []
     
-    # 1. HEADER (Centered)
+    # 1. HEADER (Centered, No Tables, No Pipes)
     story.append(Paragraph(final_data["full_name"], name_style))
-    contact = " | ".join(filter(None, [final_data.get('phone'), final_data.get('email'), final_data.get('location')]))
+    # Using bullets instead of pipes so Word doesn't think it's a table
+    contact = " • ".join(filter(None, [final_data.get('phone'), final_data.get('email'), final_data.get('location')]))
     if contact:
-        story.append(Paragraph(f"| {contact} |", contact_style))
+        story.append(Paragraph(contact, contact_style))
     
-    # 2. SECTIONS (Left Aligned, No Lines)
+    # 2. SECTIONS (Underscore Lines for absolute PDF-to-Word compatibility)
     def add_section(title, content):
         if not content: return
         story.append(Paragraph(title, section_style))
+        
+        # Literal underscores. Word cannot delete this because it is text.
+        story.append(Paragraph("__________________________________________________________________________________", line_style))
         
         lines = content.split('\n')
         for line in lines:

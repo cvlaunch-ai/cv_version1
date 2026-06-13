@@ -3,8 +3,8 @@ setlocal
 set PYTHONIOENCODING=utf-8
 
 REM Define paths
-set "BACKEND_DIR=%~dp0voice\whisper_backend"
-set "APP_DIR=%~dp0voice\voice_app"
+set "BACKEND_DIR=%~dp0whisper_backend"
+set "APP_DIR=%~dp0voice_app"
 set "VENV_DIR=%BACKEND_DIR%\venv"
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 
