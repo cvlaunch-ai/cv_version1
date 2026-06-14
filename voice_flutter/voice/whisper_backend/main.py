@@ -72,8 +72,11 @@ async def transcribe_audio(file: UploadFile = File(...)):
 import subprocess
 import platform
 
-# Use D: drive for all file operations as requested
+# Use D: drive for all file operations as requested, fall back to current directory if D: is missing
 BASE_CONVERSION_DIR = "D:\\conversions"
+if not os.path.exists("D:\\"):
+    BASE_CONVERSION_DIR = os.path.join(os.getcwd(), "conversions")
+
 DOWNLOADS_DIR = os.path.join(BASE_CONVERSION_DIR, "downloads")
 
 # Ensure directories exist
@@ -972,7 +975,7 @@ def generate_content_with_gemini(text: str, doc_type: str = "resume"):
     Uses Google Gemini to extract and polish content.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-flash-latest')
         
         if doc_type == "resume":
             prompt = (
@@ -1882,7 +1885,7 @@ async def chat_resume(data: dict = Body(...)):
 
     # Try Gemini first (free)
     try:
-        gemini_model = genai.GenerativeModel('gemini-1.5-flash')
+        gemini_model = genai.GenerativeModel('gemini-flash-latest')
         response = gemini_model.generate_content(prompt)
         ai_reply = response.text.strip()
         ready = "[READY_TO_GENERATE]" in ai_reply
@@ -2465,7 +2468,8 @@ async def generate_targeted_resume(req: TargetedResumeRequest):
                     messages=[{"role": "user", "content": prompt}]
                 )
                 ai_data = chat_response.choices[0].message.content
-            except: pass
+            except Exception as e:
+                print(f"Targeted Resume Mistral Error: {e}")
 
         if not ai_data and openai.api_key:
             try:
@@ -2475,14 +2479,16 @@ async def generate_targeted_resume(req: TargetedResumeRequest):
                     messages=[{"role": "user", "content": prompt}]
                 )
                 ai_data = response.choices[0].message.content
-            except: pass
+            except Exception as e:
+                print(f"Targeted Resume OpenAI Error: {e}")
 
         if not ai_data and gemini_api_key:
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-flash-latest')
                 response = model.generate_content(prompt)
                 ai_data = response.text
-            except: pass
+            except Exception as e:
+                print(f"Targeted Resume Gemini Error: {e}")
 
         if not ai_data:
             return {"error": "AI generation failed. Please check your API keys."}
