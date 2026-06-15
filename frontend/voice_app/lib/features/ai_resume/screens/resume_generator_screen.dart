@@ -7,6 +7,7 @@ import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../theme/app_theme.dart';
 import '../../../shared/widgets/custom_button.dart';
 import '../../../shared/widgets/voice_orb.dart';
+import '../../../shared/utils/responsive.dart';
 
 class ResumeGeneratorScreen extends StatefulWidget {
   const ResumeGeneratorScreen({super.key});
@@ -17,6 +18,7 @@ class ResumeGeneratorScreen extends StatefulWidget {
 
 class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
   bool _isSpeakMode = true; 
+  int _activeWriteTab = 0;
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   String _capturedText = "";
@@ -144,7 +146,7 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
       if (response.statusCode == 200) {
         final blob = html.Blob([response.bodyBytes], 'application/pdf');
         final url = html.Url.createObjectUrlFromBlob(blob);
-        final anchor = html.AnchorElement(href: url)
+        html.AnchorElement(href: url)
           ..setAttribute("download", "resume.pdf")
           ..click();
         html.Url.revokeObjectUrl(url);
@@ -301,23 +303,27 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final bool isMob = Responsive.isMobile(context);
     return AppBar(
       backgroundColor: Colors.transparent,
       elevation: 0,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 20),
-        child: const Icon(Icons.auto_awesome, color: AppColors.primaryAccent),
-      ),
+      leading: isMob
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(left: 20),
+              child: const Icon(Icons.auto_awesome, color: AppColors.primaryAccent),
+            ),
       title: _buildSegmentedControl(),
       centerTitle: true,
       actions: [
         IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.home, size: 20, color: Colors.white)),
-        const SizedBox(width: 20),
+        SizedBox(width: isMob ? 8 : 20),
       ],
     );
   }
 
   Widget _buildSegmentedControl() {
+    final bool isMob = Responsive.isMobile(context);
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -328,7 +334,7 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildSegmentButton("Speak to resume", Icons.mic, _isSpeakMode, () {
+          _buildSegmentButton(isMob ? "Speak" : "Speak to resume", Icons.mic, _isSpeakMode, () {
             setState(() {
               _isSpeakMode = true;
               _hasGenerated = false;
@@ -337,7 +343,7 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
               _transcriptionController.clear();
             });
           }),
-          _buildSegmentButton("Write to resume", Icons.edit_document, !_isSpeakMode, () {
+          _buildSegmentButton(isMob ? "Write" : "Write to resume", Icons.edit_document, !_isSpeakMode, () {
             setState(() {
               _isSpeakMode = false;
               _hasGenerated = false;
@@ -372,7 +378,124 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
 
   Widget _buildSpeakUI() {
     final showRightPanel = _isListening || _capturedText.isNotEmpty || _hasGenerated;
-    
+    final bool isMob = Responsive.isMobile(context);
+
+    if (isMob) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          children: [
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "AI resume builder",
+                  style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                ).animate().fadeIn().slideY(begin: 0.1, end: 0),
+                const SizedBox(height: 12),
+                const Text(
+                  "Have a conversation, Get a stunning resume",
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 200.ms),
+                const SizedBox(height: 40),
+                VoiceOrb(isListening: _isListening),
+                const SizedBox(height: 40),
+                CustomButton(
+                  text: _isListening ? "Listening..." : (_hasGenerated ? "Restart Voice" : "Tap to speak"),
+                  onPressed: () {
+                    if (_isAITyping) return;
+                    if (_hasGenerated) {
+                      setState(() {
+                        _hasGenerated = false;
+                        _capturedText = "";
+                        _resumePreview = "";
+                        _transcriptionController.clear();
+                      });
+                    }
+                    _toggleListening();
+                  },
+                ).animate().scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1)),
+                if (_isAITyping)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 20),
+                    child: CircularProgressIndicator(color: AppColors.primaryAccent),
+                  ),
+              ],
+            ),
+            if (showRightPanel) ...[
+              const SizedBox(height: 32),
+              Container(
+                height: 400,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0A0F1E),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _hasGenerated ? Icons.description : Icons.format_quote,
+                            color: AppColors.primaryAccent,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: _isAITyping 
+                              ? const Center(child: CircularProgressIndicator(color: AppColors.primaryAccent))
+                              : TextField(
+                                  controller: _transcriptionController,
+                                  maxLines: null,
+                                  readOnly: _hasGenerated,
+                                  textAlign: _hasGenerated ? TextAlign.left : TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: _hasGenerated ? 12 : 18,
+                                    fontWeight: FontWeight.w300,
+                                    fontFamily: _hasGenerated ? 'monospace' : null,
+                                    height: 1.5,
+                                  ),
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: _isListening ? "I'm listening..." : "Your text here...",
+                                    hintStyle: const TextStyle(color: Colors.white24),
+                                  ),
+                                  onChanged: (val) {
+                                    setState(() {
+                                      _capturedText = val;
+                                      if (_hasGenerated) _resumePreview = val;
+                                    });
+                                  },
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_hasGenerated)
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: IconButton(
+                          onPressed: _downloadResume,
+                          icon: const Icon(Icons.download_for_offline, color: AppColors.primaryAccent, size: 28),
+                          tooltip: "Download PDF",
+                        ).animate().fadeIn().slideX(begin: 0.5, end: 0),
+                      ),
+                  ],
+                ),
+              ).animate().slideY(begin: 0.2, end: 0, duration: 400.ms, curve: Curves.easeOutCubic),
+            ],
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
@@ -495,9 +618,27 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
   }
 
   Widget _buildWriteUI() {
-    // Show the split screen if we have at least one user message
     final bool showRightPanel = _messages.length > 1;
-    
+    final bool isMob = Responsive.isMobile(context);
+
+    if (isMob) {
+      return Column(
+        children: [
+          _buildWriteTabBar(showRightPanel),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: _activeWriteTab == 0
+                  ? _buildChatSection()
+                  : (showRightPanel 
+                      ? _buildPreviewSection() 
+                      : _buildEmptyPreviewPlaceholder()),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(24.0),
       child: Row(
@@ -513,6 +654,58 @@ class _ResumeGeneratorScreenState extends State<ResumeGeneratorScreen> {
             child: showRightPanel 
               ? _buildPreviewSection().animate().fadeIn().slideX(begin: 0.1, end: 0)
               : _buildEmptyPreviewPlaceholder(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWriteTabBar(bool showRightPanel) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeWriteTab = 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _activeWriteTab == 0 ? AppColors.secondaryAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Center(
+                  child: Text(
+                    "Chat Editor",
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeWriteTab = 1),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _activeWriteTab == 1 ? AppColors.secondaryAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Center(
+                  child: Text(
+                    showRightPanel ? "Live Preview ✨" : "Preview",
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),

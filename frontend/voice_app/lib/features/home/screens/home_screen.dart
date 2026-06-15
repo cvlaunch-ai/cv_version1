@@ -23,11 +23,17 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   Widget build(BuildContext context) {
+    final bool useDrawer = MediaQuery.of(context).size.width < 800;
+
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(useDrawer),
+      drawer: useDrawer ? _buildDrawer() : null,
       body: Stack(
         children: [
           // Background Gradient Glow
@@ -60,7 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(bool useDrawer) {
     return AppBar(
       backgroundColor: AppColors.background.withOpacity(0.8),
       elevation: 0,
@@ -84,38 +90,133 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      actions: [
-        CustomButton(
-          text: 'AI Resume',
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const ResumeGeneratorScreen()));
-          },
-          isOutlined: true,
+      actions: useDrawer
+          ? [
+              IconButton(
+                icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+                onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+              ),
+              const SizedBox(width: 16),
+            ]
+          : [
+              CustomButton(
+                text: 'AI Resume',
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const ResumeGeneratorScreen()));
+                },
+                isOutlined: true,
+              ),
+              const SizedBox(width: 12),
+              CustomButton(
+                text: 'AI Targeted Resume',
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const JobTargetedResumeScreen()));
+                },
+                isOutlined: true,
+              ),
+              const SizedBox(width: 12),
+              CustomButton(
+                text: 'AI Cover Letter',
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const CoverLetterGeneratorScreen()));
+                },
+                isOutlined: true,
+              ),
+              const SizedBox(width: 24),
+            ],
+    );
+  }
+
+  Widget _buildDrawer() {
+    return Drawer(
+      backgroundColor: AppColors.background,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(color: AppColors.border.withOpacity(0.1)),
+          ),
         ),
-        const SizedBox(width: 12),
-        CustomButton(
-          text: 'AI Targeted Resume',
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const JobTargetedResumeScreen()));
-          },
-          isOutlined: true,
+        child: Column(
+          children: [
+            DrawerHeader(
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: AppColors.border.withOpacity(0.1)),
+                ),
+              ),
+              child: Row(
+                children: [
+                  ShaderMask(
+                    shaderCallback: (bounds) => AppColors.primaryGradient.createShader(bounds),
+                    child: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'DOCFORGE AI',
+                    style: AppTheme.logoStyle.copyWith(fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            _buildDrawerItem(
+              icon: Icons.description,
+              title: 'AI Resume',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const ResumeGeneratorScreen()));
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildDrawerItem(
+              icon: Icons.track_changes,
+              title: 'AI Targeted Resume',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const JobTargetedResumeScreen()));
+              },
+            ),
+            const SizedBox(height: 12),
+            _buildDrawerItem(
+              icon: Icons.edit_document,
+              title: 'AI Cover Letter',
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const CoverLetterGeneratorScreen()));
+              },
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        CustomButton(
-          text: 'AI Cover Letter',
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const CoverLetterGeneratorScreen()));
-          },
-          isOutlined: true,
-        ),
-        const SizedBox(width: 24),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListTile(
+        leading: Icon(icon, color: AppColors.primaryAccent),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        hoverColor: Colors.white.withOpacity(0.05),
+        onTap: onTap,
+      ),
     );
   }
 
   Widget _buildHeroSection() {
+    final double width = MediaQuery.of(context).size.width;
+    final double paddingVal = width < 600 ? 16.0 : 24.0;
+    final double verticalPadding = width < 600 ? 60.0 : (width < 1024 ? 80.0 : 100.0);
+    final double headlineSize = width < 600 ? 32.0 : (width < 1024 ? 40.0 : 48.0);
+    final double descSize = width < 600 ? 14.0 : (width < 1024 ? 16.0 : 18.0);
+
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 100, horizontal: 24),
+      padding: EdgeInsets.symmetric(vertical: verticalPadding, horizontal: paddingVal),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -125,15 +226,15 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               'The Future of Document Intelligence',
               textAlign: TextAlign.center,
-              style: AppTheme.headlineStyle.copyWith(fontSize: 48, color: Colors.white),
+              style: AppTheme.headlineStyle.copyWith(fontSize: headlineSize, color: Colors.white),
             ),
           ).animate().fadeIn(duration: 800.ms).slideY(begin: 0.2, end: 0),
           const SizedBox(height: 24),
           Text(
             'DocForge AI combines advanced PDF tools with neural intelligence to transform how you work.\nFast, secure, and powered by the next generation of web design.',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 18,
+            style: TextStyle(
+              fontSize: descSize,
               color: AppColors.textMuted,
               height: 1.6,
             ),
@@ -155,12 +256,16 @@ class _HomeScreenState extends State<HomeScreen> {
       {'name': 'Excel to PDF', 'desc': 'Convert spreadsheets into readable PDFs.', 'icon': Icons.grid_on, 'screen': const ExcelToPdfTool()},
     ];
 
+    final double width = MediaQuery.of(context).size.width;
+    final double paddingVal = width < 600 ? 16.0 : 40.0;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
+      padding: EdgeInsets.symmetric(horizontal: paddingVal),
       constraints: const BoxConstraints(maxWidth: 1400),
       child: LayoutBuilder(
         builder: (context, constraints) {
           int crossAxisCount = constraints.maxWidth > 1200 ? 4 : (constraints.maxWidth > 800 ? 3 : (constraints.maxWidth > 600 ? 2 : 1));
+          double childAspectRatio = constraints.maxWidth > 1200 ? 0.9 : (constraints.maxWidth > 800 ? 1.0 : (constraints.maxWidth > 600 ? 1.0 : 1.3));
           return GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -168,7 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisCount: crossAxisCount,
               crossAxisSpacing: 24,
               mainAxisSpacing: 24,
-              childAspectRatio: 0.9,
+              childAspectRatio: childAspectRatio,
             ),
             itemCount: tools.length,
             itemBuilder: (context, index) {
@@ -194,20 +299,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildFooter() {
-     return Container(
-       width: double.infinity,
-       padding: const EdgeInsets.symmetric(vertical: 60),
-       decoration: BoxDecoration(
-         border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.1))),
-       ),
-       child: Column(
-         children: [
-           Text(
-             '© 2026 DOCFORGE AI - PREMIUM DOCUMENT SOLUTIONS',
-             style: TextStyle(color: AppColors.textMuted, fontSize: 12, letterSpacing: 2),
-           ),
-         ],
-       ),
-     );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.border.withOpacity(0.1))),
+      ),
+      child: const Column(
+        children: [
+          Text(
+            '© 2026 DOCFORGE AI - PREMIUM DOCUMENT SOLUTIONS',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12, letterSpacing: 2),
+          ),
+        ],
+      ),
+    );
   }
 }

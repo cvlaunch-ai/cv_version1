@@ -3,7 +3,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:math' as math;
 import 'theme/app_theme.dart';
 import 'shared/widgets/custom_button.dart';
 import 'shared/widgets/voice_orb.dart';

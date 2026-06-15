@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:html' as html;
 import '../../../theme/app_theme.dart';
 import '../../../shared/widgets/custom_button.dart';
+import '../../../shared/utils/responsive.dart';
 
 class CoverLetterGeneratorScreen extends StatefulWidget {
   const CoverLetterGeneratorScreen({super.key});
@@ -25,6 +26,7 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
   final ScrollController _scrollController = ScrollController();
   bool _isAITyping = false;
   String _previewContent = "Your cover letter will appear here as we chat...";
+  int _activeTab = 0; // 0 = Chat, 1 = Preview
   final String _baseUrl = 'http://127.0.0.1:8001';
 
   void _addMessage(String role, String text) {
@@ -69,6 +71,7 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
         _addMessage('ai', "I've drafted a cover letter based on that! How does it look?");
         setState(() {
           _previewContent = result['cover_letter'];
+          _activeTab = 1;
         });
       }
     } catch (e) {
@@ -98,21 +101,87 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final bool isMob = Responsive.isMobile(context);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: _buildAppBar(),
-      body: Row(
+      body: isMob
+          ? Column(
+              children: [
+                _buildTabBar(),
+                Expanded(
+                  child: _activeTab == 0
+                      ? _buildChatSection()
+                      : _buildPreviewSection(),
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(flex: 5, child: _buildChatSection()),
+                Container(width: 1, color: AppColors.border.withOpacity(0.1)),
+                Expanded(flex: 5, child: _buildPreviewSection()),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D1117),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
         children: [
-          Expanded(flex: 5, child: _buildChatSection()),
-          Container(width: 1, color: AppColors.border.withOpacity(0.1)),
-          Expanded(flex: 5, child: _buildPreviewSection()),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeTab = 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _activeTab == 0 ? AppColors.secondaryAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Center(
+                  child: Text(
+                    "Chat",
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _activeTab = 1),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: _activeTab == 1 ? AppColors.secondaryAccent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Center(
+                  child: Text(
+                    "Preview",
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
   PreferredSizeWidget _buildAppBar() {
+    final bool isMob = Responsive.isMobile(context);
     return AppBar(
       backgroundColor: AppColors.background.withOpacity(0.8),
       elevation: 0,
@@ -121,7 +190,7 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
         onPressed: () => Navigator.pop(context),
       ),
       title: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        padding: EdgeInsets.symmetric(horizontal: isMob ? 12 : 24, vertical: 8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(30),
@@ -134,16 +203,18 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
             const SizedBox(width: 8),
             Text(
               "Write cover letter",
-              style: AppTheme.logoStyle.copyWith(fontSize: 14, letterSpacing: 1),
+              style: AppTheme.logoStyle.copyWith(fontSize: 12, letterSpacing: 1),
             ),
           ],
         ),
       ),
       centerTitle: true,
-      actions: [
-        CustomButton(text: 'Download', onPressed: _downloadPDF, isOutlined: true),
-        const SizedBox(width: 24),
-      ],
+      actions: isMob
+          ? null
+          : [
+              CustomButton(text: 'Download', onPressed: _downloadPDF, isOutlined: true),
+              const SizedBox(width: 24),
+            ],
     );
   }
 
@@ -222,10 +293,32 @@ class _CoverLetterGeneratorScreenState extends State<CoverLetterGeneratorScreen>
   }
 
   Widget _buildPreviewSection() {
+    final bool isMob = Responsive.isMobile(context);
     return Container(
-      padding: const EdgeInsets.all(40),
       color: AppColors.secondaryBG.withOpacity(0.3),
-      child: SingleChildScrollView(child: Text(_previewContent, style: const TextStyle(color: AppColors.textPrimary, fontFamily: 'monospace'))),
+      child: Stack(
+        children: [
+          Padding(
+            padding: EdgeInsets.all(isMob ? 24.0 : 40.0),
+            child: SingleChildScrollView(
+              child: Text(
+                _previewContent,
+                style: const TextStyle(color: AppColors.textPrimary, fontFamily: 'monospace', height: 1.5),
+              ),
+            ),
+          ),
+          if (isMob && !_previewContent.contains("appear here"))
+            Positioned(
+              bottom: 24,
+              right: 24,
+              child: FloatingActionButton(
+                backgroundColor: AppColors.primaryAccent,
+                onPressed: _downloadPDF,
+                child: const Icon(Icons.download, color: Colors.white),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

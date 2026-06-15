@@ -88,7 +88,6 @@ class _WaveMeshPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final double midY = size.height / 2;
-    final double width = size.width;
     final double p = progress * 2 * 3.14159;
 
     // Cyan Waves
