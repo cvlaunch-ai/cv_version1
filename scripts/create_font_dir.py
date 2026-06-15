@@ -1,7 +1,7 @@
 import shutil
 import os
 
-font_dir = "d:/voice_flutter/voice/voice_app/assets/fonts"
+font_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "voice_app", "assets", "fonts")
 os.makedirs(font_dir, exist_ok=True)
 
 # We don't have internet access to download, but we should check if we can simulate or if the user has it.

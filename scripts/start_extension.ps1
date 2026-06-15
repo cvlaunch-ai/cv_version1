@@ -7,7 +7,7 @@ Write-Host ""
 
 # Step 1: Check if backend dependencies are installed
 Write-Host "[1/3] Checking backend dependencies..." -ForegroundColor Yellow
-$backendPath = "d:\voice_flutter\voice\whisper_backend"
+$backendPath = Join-Path $PSScriptRoot "..\backend"
 
 try {
     python -c "import fastapi" 2>$null
@@ -38,7 +38,7 @@ Write-Host ""
 Write-Host "1. Open Chrome and go to: chrome://extensions/" -ForegroundColor White
 Write-Host "2. Enable 'Developer mode' (toggle in top-right)" -ForegroundColor White
 Write-Host "3. Click 'Load unpacked'" -ForegroundColor White
-Write-Host "4. Select folder: d:\voice_flutter\voice\chrome_extension" -ForegroundColor White
+Write-Host "4. Select folder: <project-root>\frontend\chrome_extension" -ForegroundColor White
 Write-Host "5. Click the extension icon to start using it!" -ForegroundColor White
 Write-Host ""
 Write-Host "Features:" -ForegroundColor Green
@@ -53,4 +53,4 @@ Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
 Write-Host ""
 
 # Start the server
-python main.py
+python -m uvicorn app.main:app --reload --port 8001

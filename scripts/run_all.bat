@@ -3,8 +3,8 @@ setlocal
 set PYTHONIOENCODING=utf-8
 
 REM Define paths
-set "BACKEND_DIR=%~dp0voice\whisper_backend"
-set "APP_DIR=%~dp0voice\voice_app"
+set "BACKEND_DIR=%~dp0..\backend"
+set "APP_DIR=%~dp0..\frontend\voice_app"
 set "VENV_DIR=%BACKEND_DIR%\venv"
 set "VENV_PYTHON=%VENV_DIR%\Scripts\python.exe"
 
@@ -30,7 +30,7 @@ REM Install dependencies
 
 REM Start Backend
 echo [2/3] Starting Backend Server...
-start "VoiceBackend" "%VENV_PYTHON%" -m uvicorn main:app --reload --port 8001
+start "VoiceBackend" "%VENV_PYTHON%" -m uvicorn app.main:app --reload --port 8001
 popd
 
 REM Wait for backend to potentially start

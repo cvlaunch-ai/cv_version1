@@ -1,22 +1,8 @@
 """
-prompts.py
-==========
+prompts/__init__.py
+==================
 Central location for ALL AI prompts used in resume / cover-letter generation.
-
-HOW TO EDIT:
-  - Change RESUME_EXTRACT_PROMPT to control what the AI extracts from user input.
-  - Change COVER_LETTER_PROMPT to control how cover letters are written.
-
-RULES (do NOT remove these):
-  1. AI must NEVER invent data not present in user input.
-  2. If a field is missing -> return "" or [].
-  3. No placeholders like "Your Name", "University Name", "N/A".
 """
-
-# ============================================================
-# RESUME EXTRACTION PROMPT
-# Used by: generate_content_with_gemini(), generate_content_with_openai()
-# ============================================================
 
 RESUME_EXTRACT_PROMPT = """You are a STRICT Resume Data Extractor.
 Your ONLY job is to extract data that is EXPLICITLY written in the user's input.
@@ -50,12 +36,6 @@ User Input:
 <<<
 {user_input}
 >>>"""
-
-
-# ============================================================
-# COVER LETTER PROMPT
-# Used by: generate_content_with_gemini(), generate_content_with_openai()
-# ============================================================
 
 COVER_LETTER_PROMPT = """You are an expert professional cover letter writer.
 Write a cover letter using ONLY the information provided in the user input below.

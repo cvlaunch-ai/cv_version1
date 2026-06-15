@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/backend"
+  ],
+  "dart.flutterSdkPath": "C:\\develop\\flutter_windows_3.38.7-stable\\flutter"
+}
